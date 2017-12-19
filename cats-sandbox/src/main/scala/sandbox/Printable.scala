@@ -28,8 +28,6 @@ object Printable {
   }
 }
 
-final case class Cat(name: String, age: Int, color: String)
-
 object PrintableSyntax {
   implicit class PrintableOps[A](value: A) {
     def format(implicit printer: Printable[A]): String =
