@@ -1,6 +1,9 @@
+// the type class
 import cats.{Monoid => CMonoid}
+// instances
 import cats.instances.int._
 import cats.instances.double._
+// syntax
 import cats.syntax.semigroup._
 
 object AddingAllTheThings {
