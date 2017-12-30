@@ -1,0 +1,55 @@
+* Functors
+** 3.1 Examples of Functors
+   #+BEGIN_QUOTE
+   We should think of map not as an iteration pattern,
+   but as a way of sequencing computations on values ignoring some complication
+   dictated by the relevant data type
+
+   * Option
+     * the value may or may not be present
+   * Either
+     * there may be a value or an error
+   * List
+     * there may be zero or more values
+   #+END_QUOTE
+** 3.2 More Examples of Functors
+*** Futures
+    [[https://www.reddit.com/r/scala/comments/3zofjl/why_is_future_totally_unusable/][Why is Future "totally unusable"? : scala]]
+*** Function
+    #+BEGIN_SRC
+    scala> import cats.instances.function._; import cats.syntax.functor._
+    import cats.instances.function._
+    import cats.syntax.functor._
+
+    scala> val func1: Int => Double = (x: Int) => x.toDouble
+    func1: Int => Double = $$Lambda$1549/1603943619@1c54604c
+
+    scala> val func2: Double => Double = (y: Double) => y * 2
+    func2: Double => Double = $$Lambda$1550/1851918548@59a65b77
+
+    scala> (func1 map func2)(1)
+    <console>:97: error: value map is not a member of Int => Double
+    (func1 map func2)(1)
+    ^
+
+    scala> (func1 andThen func2)(1)
+    res20: Double = 2.0
+    #+END_SRC
+** 3.4 Aside: Higher Kinds and Type Constructors
+   - List
+     - type constructor, takes one parameter
+   - List[A]
+     - type, produced using a type parameter
+       
+   - math.abs
+     - function, takes one parameter
+   - math.abs(x)
+     - value, produced using a value parameter
+
+   #+BEGIN_SRC scala
+     // Declare F using underscores:
+     def myMethod[F[_]] = {
+       // Reference F without underscores:
+       val functor = Functor.apply[F]
+     }
+   #+END_SRC
