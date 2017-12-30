@@ -40,7 +40,7 @@
      - type constructor, takes one parameter
    - List[A]
      - type, produced using a type parameter
-       
+
    - math.abs
      - function, takes one parameter
    - math.abs(x)
@@ -53,3 +53,11 @@
        val functor = Functor.apply[F]
      }
    #+END_SRC
+** 3.6 Contravariant and Invariant Functors
+#+BEGIN_QUOTE
+If F is a covariant functor, wherever we have an F[A] and a conversion A => B, we can always convert to an F[B]
+
+If F is a contravariant functor, wherever we have a F[A] and a conversion B => A, we can convert to an F[B]
+
+Invariant functors capture the case where we can convert from F[A] to F[B] via a function A => B and vice versa via a function B => A
+#+END_QUOTE
