@@ -10,6 +10,7 @@ import cats.syntax.applicativeError._
 import cats.syntax.monadError._
 import scala.util.Try
 import cats.instances.try_._
+import cats.Eval
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -93,4 +94,80 @@ object Chapter4 {
 
   val exn: Throwable = new RuntimeException("It's all gone wrong")
   exn.raiseError[Try, Int]
+
+  val x = {
+    println("Computing X")
+    math.random()
+  }
+
+  def y = {
+    println("Computing Y")
+    math.random()
+  }
+
+  lazy val z = {
+    println("Computing Z")
+    math.random()
+  }
+
+  val now = Eval.now(math.random() + 1000)
+  val later = Eval.later(math.random() + 2000)
+  val always = Eval.always(math.random() + 3000)
+
+  val _x = Eval.now({
+    println("Computing X")
+    math.random()
+  })
+
+  val _y = Eval.always {
+    println("Computing Y")
+    math.random()
+  }
+
+  val _z = Eval.later {
+    println("Computing Z")
+    math.random()
+  }
+
+  val greeting = Eval.always {
+    println("Step 1")
+    "Hello"
+  }.map { str =>
+    println("Step 2")
+    s"${str} world"
+  }
+
+  val ans = for {
+    a <- Eval.now { println("Calculating A"); 40 }
+    b <- Eval.always { println("Calculating B"); 2 }
+  } yield {
+    println("Adding A and B")
+    a + b
+  }
+
+  val saying = Eval.
+    always { println("Step 1"); "The cat" }.
+    map { str => println("Step 2"); s"${str} sat on" }.
+    memoize.
+    map { str => println("Step 3"); s"${str} the mat" }
+
+  def factorial(n: BigInt): Eval[BigInt] =
+    if (n == 1) {
+      Eval.now(n)
+    } else {
+      Eval.defer(
+        factorial(n - 1).map(_ * n)
+      )
+    }
+
+  def foldRightEval[A, B](as: List[A], acc: Eval[B])(fn: (A, Eval[B]) => Eval[B]): Eval[B] =
+    as match {
+      case head :: tail => Eval.defer(fn(head, foldRightEval(tail, acc)(fn)))
+      // Stack Over flow
+      // case head :: tail => fn(head, foldRightEval(tail, acc)(fn))
+      case Nil => acc
+    }
+
+  def foldRight[A, B](as: List[A], acc: B)(fn: (A, B) => B): B =
+    foldRightEval(as, Eval.now(acc))((a, b) => b.map(fn(a, _))).value
 }
