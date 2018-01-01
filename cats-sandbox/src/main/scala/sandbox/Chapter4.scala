@@ -2,6 +2,7 @@ import cats.{ Monad => CMonad }
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 import cats.Id
+import cats.syntax.either._
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -30,4 +31,34 @@ object Chapter4 {
   def pure[A](a: A): Id[A] = a
   def map[A, B](fa: Id[A])(f: A => B): Id[B] = f(fa)
   def flatMap[A, B](fa: Id[A])(f: A => Id[B]): Id[B] = f(fa)
+
+  def countPositive(nums: List[Int]) =
+    // need Either[String, Int]
+    // nums.foldLeft(Right(0))((acc, num) => {
+    nums.foldLeft(0.asRight[String])((acc, num) => {
+      if (num > 0) {
+        acc.map(_ + 1)
+      } else {
+        Left("Negative. Stopping!")
+      }
+    })
+
+  sealed trait LoginError extends Product with Serializable
+  final case class UserNotFound(username: String) extends LoginError
+  final case class PasswordIncorrect(username: String) extends LoginError
+  case object UnexpectedError extends LoginError
+  case class User(username: String, password: String)
+  type LoginResult = Either[LoginError, User]
+
+  def handleError(error: LoginError): Unit =
+    error match {
+      case UserNotFound(u) => println(s"User not found: ${u}")
+      case PasswordIncorrect(u) => println(s"Password incorrect: ${u}")
+      case UnexpectedError => println(s"Unexpected error")
+    }
+
+  val result1: LoginResult = User("dave", "passw0rd").asRight
+  val result2: LoginResult = UserNotFound("dave").asLeft
+  result1.fold(handleError, println)
+  result2.fold(handleError, println)
 }
