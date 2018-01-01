@@ -3,6 +3,13 @@ import cats.syntax.functor._
 import cats.syntax.flatMap._
 import cats.Id
 import cats.syntax.either._
+import cats.{ MonadError => CMonadError }
+import cats.instances.either._
+import cats.syntax.applicative._
+import cats.syntax.applicativeError._
+import cats.syntax.monadError._
+import scala.util.Try
+import cats.instances.try_._
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -59,6 +66,31 @@ object Chapter4 {
 
   val result1: LoginResult = User("dave", "passw0rd").asRight
   val result2: LoginResult = UserNotFound("dave").asLeft
-  result1.fold(handleError, println)
-  result2.fold(handleError, println)
+  // result1.fold(handleError, println)
+  // result2.fold(handleError, println)
+
+  trait MonadError[F[_], E] extends Monad[F] {
+    // Lift an error into the `F` context
+    def raiseError[A](e: E): F[A]
+    // Handle an error, potentially recovering from it:
+    def handleError[A](fa: F[A])(f: E => A): F[A]
+    // Test an instance of `F`, fail if the predicate is not satisfied
+    def ensure[A](fa: F[A])(e: E)(f: A => Boolean): F[A]
+  }
+
+  type ErrorOr[A] = Either[String, A]
+  val monadError = CMonadError[ErrorOr, String]
+  // val success = monadError.pure(42)
+  val success = 42.pure[ErrorOr]
+  // val failure = monadError.raiseError("Badness")
+  val failure = "Badness".raiseError[ErrorOr, Int]
+  // monadError.handleError(failure)(str => str match {
+  //   case "Badness" => monadError.pure("It's ok")
+  //   case other => monadError.raiseError("It's not ok")
+  // })
+  // monadError.ensure(success)("Number too low!")(_ > 1000)
+  success.ensure("Number to low!")(_ > 1000)
+
+  val exn: Throwable = new RuntimeException("It's all gone wrong")
+  exn.raiseError[Try, Int]
 }
