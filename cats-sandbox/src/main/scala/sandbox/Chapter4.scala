@@ -17,6 +17,7 @@ import cats.syntax.writer._
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import cats.data.Reader
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -238,4 +239,51 @@ object Chapter4 {
       5000.seconds
     )
   }
+
+  case class Cat(name: String, favoriteFood: String)
+  val catName: Reader[Cat, String] = Reader(cat => cat.name)
+  val greetKitty: Reader[Cat, String] = catName.map(name => s"Hello ${name}")
+
+  val feedKitty: Reader[Cat, String] =
+    Reader(cat => s"Have a nice bowl of ${cat.favoriteFood}")
+  val greetAndFeed: Reader[Cat, String] =
+    greetKitty.flatMap { greet =>
+      feedKitty.map { feed =>
+        s"${greet}. ${feed}"
+      }
+    }
+
+  type Username = String
+  type Password = String
+  type UserId = Int
+  case class Db(usernames: Map[UserId, Username], passwords: Map[Username, Password])
+  type DbReader[A] = Reader[Db, A]
+
+  def findUsername(userId: UserId): DbReader[Option[Username]] =
+    Reader((db: Db) => db.usernames.get(userId))
+
+  def checkPassword(username: Username, password: Password): DbReader[Boolean] =
+    Reader((db: Db) => db.passwords.get(username).contains(password))
+
+  def checkLogin(userId: UserId, password: Password): DbReader[Boolean] =
+    findUsername(userId).flatMap {
+      _ match {
+        case Some(username) => checkPassword(username, password)
+        case _ => false.pure[DbReader]
+      }
+    }
+
+  val users = Map(
+    1 -> "dade",
+    2 -> "kate",
+    3 -> "margo"
+  )
+
+  val passwords = Map(
+    "dade" -> "zerocool",
+    "kate" -> "acidburn",
+    "margo" -> "secret"
+  )
+
+  val db = Db(users, passwords)
 }
