@@ -11,6 +11,12 @@ import cats.syntax.monadError._
 import scala.util.Try
 import cats.instances.try_._
 import cats.Eval
+import cats.data.Writer
+import cats.instances.vector._
+import cats.syntax.writer._
+import scala.concurrent._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -170,4 +176,66 @@ object Chapter4 {
 
   def foldRight[A, B](as: List[A], acc: B)(fn: (A, B) => B): B =
     foldRightEval(as, Eval.now(acc))((a, b) => b.map(fn(a, _))).value
+
+  type Logged[A] = Writer[Vector[String], A]
+
+  // 123.pure[Logged]
+  // Vector("msg1", "msg2", "msg3").tell
+  val a = Writer(Vector("msg1", "msg2", "msg3"), 123)
+  val b = 123.writer(Vector("msg1", "msg2", "msg3"))
+
+  val aResult: Int = a.value
+  val aLog: Vector[String] = a.written
+
+  val (log, result) = b.run
+  // it's good practice to use a log type
+  // that has an efficient append and concatenate opreations,
+  // such as a Vector
+  val writer1 = for {
+    a <- 10.pure[Logged]
+    _ <- Vector("a", "b", "c").tell
+    b <- 32.writer(Vector("x", "y", "z"))
+  } yield a + b
+
+  // val writer1 = 10.pure[Logged].flatMap((a) => {
+  //   Vector("a", "b", "c").tell.flatMap(_ => {
+  //     32.writer(Vector("x", "y", "z")).map((b) => a + b)
+  //   })
+  // })
+
+  val writer2 = writer1.mapWritten(_.map(_.toUpperCase))
+  val writer3 = writer1.bimap(
+    log => log.map(_.toUpperCase()),
+    res => res * 100
+  )
+  val writer4 = writer1.mapBoth { (log, res) => (log.map(_ + "!"), res * 1000) }
+  val writer5 = writer1.reset
+  val writer6 = writer1.swap
+
+  def slowly[A](body: => A): A =
+    try body finally Thread.sleep(1000)
+  def factorial(n: Int): Logged[Int] = {
+    if (n == 0) 1.pure[Logged]
+    else slowly(factorial((n - 1): Int).flatMap((num) => {
+      val ans = num * n
+      ans.writer(Vector(s"fact: ${n} -> ${ans}"))
+    }))
+    // for {
+    //   ans <- if (n == 0) 1.pure[Logged]
+    //   else slowly(factorial((n - 1): Int).map(_ * n))
+    //   _ <- Vector(s"fact: ${n} -> ${ans}").tell
+    // } yield ans
+  }
+
+  def exercise473 = {
+    Await.result(
+      Future.sequence(
+        Vector(
+          Future(factorial(3: Int)),
+          Future(factorial(5: Int))
+        )
+      ),
+      5000.seconds
+    )
+  }
 }
