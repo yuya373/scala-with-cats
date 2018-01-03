@@ -19,6 +19,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import cats.data.Reader
 import cats.data.State
+import scala.annotation.tailrec
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -367,4 +368,19 @@ object Chapter4 {
   def evalInput(input: String): Int =
     evalAll(input.split(" ").toList).runA(Nil).value
 
+  val optionMonad = new CMonad[Option] {
+    def flatMap[A, B](opt: Option[A])(fn: A => Option[B]): Option[B] =
+      opt.flatMap(fn)
+
+    def pure[A](opt: A): Option[A] = Some(opt)
+
+    // http://functorial.com/stack-safety-for-free/index.pdf
+    @tailrec
+    def tailRecM[A, B](a: A)(fn: A => Option[Either[A, B]]): Option[B] =
+      fn(a) match {
+        case None => None
+        case Some(Left(a1)) => tailRecM(a1)(fn)
+        case Some(Right(b)) => Some(b)
+      }
+  }
 }
