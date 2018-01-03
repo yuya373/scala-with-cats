@@ -18,6 +18,7 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import cats.data.Reader
+import cats.data.State
 
 object Chapter4 {
   def parseInt(str: String): Option[Int] =
@@ -286,4 +287,84 @@ object Chapter4 {
   )
 
   val db = Db(users, passwords)
+
+  // val state = State[Int, String] { state =>
+  //   (state, s"The state is ${state}")
+  // }
+
+  val step1 = State[Int, String] { num =>
+    val ans = num + 1
+    (ans, s"Result of step1: ${ans}")
+  }
+
+  val step2 = State[Int, String] { num =>
+    val ans = num * 2
+    (ans, s"Result of step2: ${ans}")
+  }
+
+  val both = step1.flatMap { a => step2.map(b => (a, b)) }
+  val (state, _result) = both.run(20).value
+
+  val program: State[Int, (Int, Int, Int)] = {
+    import State._
+    get[Int].flatMap { a =>
+      set[Int](a + 1).flatMap { _ =>
+        get[Int].flatMap { b =>
+          modify[Int](_ + 1).flatMap { _ =>
+            inspect[Int, Int](_ * 1000).map { c =>
+              (a, b, c)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  type CalcState[A] = State[List[Int], A]
+  // def evalOne(sym: String): CalcState[Int] = State[List[Int], Int] { oldStack =>
+  //   val newStack =
+  //     if (sym == "+") {
+  //       val op1 :: op2 :: tail = oldStack
+  //       (op1 + op2) :: tail
+  //     } else if (sym == "*") {
+  //       val op1 :: op2 :: tail = oldStack
+  //       (op1 * op2) :: tail
+  //     } else {
+  //       sym.toInt :: oldStack
+  //     }
+  //   val result :: _ = newStack
+
+  //   (newStack, result)
+  // }
+  def operator(f: (Int, Int) => Int): CalcState[Int] = {
+    State[List[Int], Int] { oldStack =>
+      oldStack match {
+        case a :: b :: tail => {
+          val ans = f(a, b)
+          (ans :: tail, ans)
+        }
+        case _ => sys.error("Fail")
+      }
+    }
+  }
+  def operand(num: Int): CalcState[Int] = State[List[Int], Int] { oldStack =>
+    (num :: oldStack, num)
+  }
+  def evalOne(sym: String): CalcState[Int] = sym match {
+    case "+" => operator((a, b) => a + b)
+    case "-" => operator((a, b) => a - b)
+    case "*" => operator((a, b) => a * b)
+    case "/" => operator((a, b) => a / b)
+    case num => operand(num.toInt)
+  }
+  def evalAll(input: List[String]): CalcState[Int] = {
+    // val head :: tail = input
+    // tail.foldLeft(evalOne(head)) { (s, sym) => s.flatMap(_ => evalOne(sym)) }
+    input.foldLeft(0.pure[CalcState]) { (a, b) => a.flatMap(_ => evalOne(b)) }
+  }
+  // val prog = evalAll(List("1", "2", "+", "3", "*"))
+  // val prog = evalAll(List("1", "2", "+")).flatMap { _ => evalAll(List("3", "4", "+")).flatMap { _ => evalOne("*") } }
+  def evalInput(input: String): Int =
+    evalAll(input.split(" ").toList).runA(Nil).value
+
 }
