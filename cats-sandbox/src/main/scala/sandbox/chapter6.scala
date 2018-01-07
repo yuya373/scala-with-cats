@@ -5,6 +5,7 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import cats.Monad
+import cats.data.Validated
 
 
 object chapter6 {
@@ -118,4 +119,101 @@ object chapter6 {
     def product[M[_]: Monad, A, B](x: M[A], y: M[B]): M[(A, B)] =
       x.flatMap(a => y.map(b => (a, b)))
   }
+}
+
+object chapter6_4 {
+  type AllErrorsOr[A] = Validated[List[String], A]
+  val error = Semigroupal[AllErrorsOr].product(Validated.invalid(List("Error 1")), Validated.invalid(List("Error 2")))
+
+  // val v = Validated.Valid(123)
+  // res3: cats.data.Validated.Valid[Int] = Valid(123)
+
+  // it is often easier to use the `valid` and `invalid` smart constructors,
+  // which siden the return type to Validated
+  val v = Validated.valid[List[String], Int](123)
+  // v: cats.data.Validated[List[String],Int] = Valid(123)
+
+  // val i = Validated.Invalid(List("Badness"))
+  // res4: cats.data.Validated.Invalid[List[String]] = Invalid(List(Badness))
+  val i = Validated.invalid[List[String], Int](List("Badness"))
+  // i: cats.data.Validated[List[String],Int] = Invalid(List(Badness))
+
+  // we can use `valid` and `invalid` extension methods by importing `cats.syntax.validated`
+  // scala> 123.valid[List[String]]
+  // res5: cats.data.Validated[List[String],Int] = Valid(123)
+
+  // scala> List("Badness").invalid[Int]
+  // res6: cats.data.Validated[List[String],Int] = Invalid(List(Badness))
+
+  type ErrorsOr[A] = Validated[List[String], A]
+  // use `pure` in `cats.syntax.applicative._`
+  // scala> 123.pure[ErrorsOr]
+  // res8: chapter6_4.ErrorsOr[Int] = Valid(123)
+  // use `raiseError` from `cats.syntax.applicativeError._`
+  // scala> List("Badness").raiseError[ErrorsOr, Int]
+  // res11: chapter6_4.ErrorsOr[Int] = Invalid(List(Badness))
+
+  Validated.catchOnly[NumberFormatException]("foo".toInt)
+  // res12: cats.data.Validated[NumberFormatException,Int] = Invalid(java.lang.NumberFormatException: For input string: "foo")
+
+  Validated.catchNonFatal(sys.error("Badness"))
+  // res13: cats.data.Validated[Throwable,Nothing] = Invalid(java.lang.RuntimeException: Badness)
+
+  Validated.fromTry(scala.util.Try("foo".toInt))
+  // res14: cats.data.Validated[Throwable,Int] = Invalid(java.lang.NumberFormatException: For input string: "foo")
+
+  Validated.fromEither[String, Int](Left("Badness"))
+  // res15: cats.data.Validated[String,Int] = Invalid(Badness)
+
+  Validated.fromOption[String, Int](None, "Badness")
+  // res16: cats.data.Validated[String,Int] = Invalid(Badness)
+}
+
+object chapter6_4_2 {
+  type AllErrorsOr[A] = Validated[String, A]
+  // Semigroupal[AllErrorsOr]
+  // res17: cats.Semigroupal[chapter6_4_2.AllErrorsOr] = cats.data.ValidatedInstances$$anon$1@8dce4ca
+
+  (
+    "Error 1".invalid[Int],
+    "Error 2".invalid[Int]
+  ).tupled
+  // res21: cats.data.Validated[String,(Int, Int)] = Invalid(Error 1Error 2)
+
+  (Vector(404).invalid[Int], Vector(500).invalid[Int]).tupled
+  // res22: cats.data.Validated[scala.collection.immutable.Vector[Int],(Int, Int)] = Invalid(Vector(404, 500))
+
+
+  // scala> 123.valid.map(_ * 100)
+  // res23: cats.data.Validated[Nothing,Int] = Valid(12300)
+
+  // scala> "?".invalid.leftMap(_.toString)
+  // res24: cats.data.Validated[String,Nothing] = Invalid(?)
+
+  // 123.valid[String].bimap(_ + "!", _ * 100)
+  // res25: cats.data.Validated[String,Int] = Valid(12300)
+
+  // scala> "?".invalid[Int].bimap(_ + "!", _ * 100)
+  // res26: cats.data.Validated[String,Int] = Invalid(?!)
+
+  // Validated isn't a Monad, we can't flatMap
+  // scala> "Badness".invalid[Int].flatMap(a => a)
+  // <console>:90: error: value flatMap is not a member of cats.data.Validated[String,Int]
+  //        "Badness".invalid[Int].flatMap(a => a)
+
+  // We can convert back and forth between Validated and Either using `toEither` and `toValidated` methods
+  // scala> "Badness".invalid[Int].toEither
+  // res31: Either[String,Int] = Left(Badness)
+  // scala> "Badness".invalid[Int].toEither.toValidated
+  // res34: cats.data.Validated[String,Int] = Invalid(Badness)
+
+  // We can use `withEither` method to temporarily convert to an Either and convert back again immediately
+  // scala> 41.valid[String].withEither(_.flatMap(n => Right(n + 1)))
+  // res35: cats.data.Validated[String,Int] = Valid(42)
+
+  // scala> "fail".invalid[Int].getOrElse(0)
+  // res38: Int = 0
+
+  // scala> "fail".invalid[Int].fold(_ + "!!!", _.toString)
+  // res39: String = fail!!!
 }
