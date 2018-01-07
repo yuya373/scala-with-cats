@@ -276,3 +276,8 @@ object chapter6_5 {
     def pure[A](a: A): F[A]
   }
 }
+
+object chapter6_5_1 {
+  // The Hierarchy of Type Class
+  // https://github.com/tpolecat/cats-infographic
+}
