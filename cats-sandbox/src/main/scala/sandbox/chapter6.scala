@@ -217,3 +217,45 @@ object chapter6_4_2 {
   // scala> "fail".invalid[Int].fold(_ + "!!!", _.toString)
   // res39: String = fail!!!
 }
+
+object chapter6_4_4 {
+  type Name = String
+  type Age = Int
+  case class User(name: Name, age: Age)
+  type ErrorsOrUser = Validated[List[String], User]
+  type Input = Map[String, String]
+
+  def getValue(input: Input, key: String): Either[List[String], String] = {
+    input.get(key).toRight(List(s"${key} field not specified"))
+  }
+
+  def nonBlank(name: String)(str: String): Either[List[String], String] = {
+    Right(str).ensure(List(s"${name} must not blank"))(_.nonEmpty)
+  }
+
+  def readName(input: Input): Either[List[String], Name] = {
+    getValue(input, "name").flatMap(nonBlank("name")(_))
+  }
+
+  def parseInt(name: String)(input: String): Either[List[String], Int] = {
+    Either.catchOnly[NumberFormatException](input.toInt).
+      leftMap(_ => List(s"${name} must be integer"))
+  }
+
+  def nonNegative(name: String)(int: Int): Either[List[String], Int] = {
+    Right(int).ensure(List(s"${name} must not negative"))(_ >= 0)
+  }
+
+  def readAge(input: Input): Either[List[String], Age] = {
+    getValue(input, "age").flatMap(ageStr => {
+      parseInt("age")(ageStr).flatMap(nonNegative("age"))
+    })
+  }
+
+  def readUser(input: Input): Validated[List[String], User] = {
+    (
+      readName(input).toValidated,
+      readAge(input).toValidated
+    ).mapN(User.apply)
+  }
+}
