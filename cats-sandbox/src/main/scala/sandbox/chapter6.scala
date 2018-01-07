@@ -6,6 +6,7 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import cats.Monad
 import cats.data.Validated
+import cats.Functor
 
 
 object chapter6 {
@@ -257,5 +258,21 @@ object chapter6_4_4 {
       readName(input).toValidated,
       readAge(input).toValidated
     ).mapN(User.apply)
+  }
+}
+
+object chapter6_5 {
+  trait Apply[F[_]] extends Semigroupal[F] with Functor[F] {
+    // applies `fa` to `ff` within a context F[_]
+    def ap[A, B](ff: F[A => B])(fa: F[A]): F[B]
+
+    def product[A, B](fa: F[A], fb: F[B]): F[(A, B)] = {
+      val ff: F[B => (A, B)] = map(fa)(a => (b: B) => (a, b))
+      ap(ff)(fb)
+    }
+  }
+
+  trait Applicative[F[_]] extends Apply[F] {
+    def pure[A](a: A): F[A]
   }
 }
