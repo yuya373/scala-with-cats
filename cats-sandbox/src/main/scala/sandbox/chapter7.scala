@@ -10,6 +10,12 @@ import cats.syntax.foldable._
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import cats.Applicative
+import cats.instances.future._
+import cats.syntax.applicative._
+import cats.syntax.apply._
+import cats.instances.vector._
+import cats.syntax.traverse._
 
 object chapter711 {
   def show[A](list: List[A]): String =
@@ -102,5 +108,95 @@ object chapter714 {
 }
 
 object chapter721 {
+  val hostnames = List(
+    "alpha.example.com",
+    "beta.example.com",
+    "gamma.demo.com"
+  )
 
+  def getUptime(hostname: String): Future[Int] =
+    Future(hostname.length() * 60)
+
+  // val allUptimes: Future[List[Int]] =
+  //   hostnames.foldLeft(Future(List.empty[Int])) { (acc, host) =>
+  //     val uptime = getUptime(host)
+  //     for {
+  //       acc <- acc
+  //       uptime <- uptime
+  //     } yield acc :+ uptime
+  //   }
+  val allUptimes: Future[List[Int]] =
+    Future.traverse(hostnames)(getUptime)
+
+  // scala> Await.result(allTimes, 1.second)
+  // res0: List[Int] = List(1020, 960, 840)
+}
+
+object chapter722 {
+  // scala> List.empty[Int].pure[Future]
+  // res4: scala.concurrent.Future[List[Int]] = Future(Success(List()))
+
+  def oldCombine(
+    acc: Future[List[Int]],
+    host: String
+  ): Future[List[Int]] = {
+    val uptime = chapter721.getUptime(host)
+    for {
+      acc <- acc
+      uptime <- uptime
+    } yield acc :+ uptime
+  }
+
+  def newCombine(
+    acc: Future[List[Int]],
+    host: String
+  ): Future[List[Int]] =
+    (acc, chapter721.getUptime(host)).mapN((l, i) => l :+ i)
+
+  def listTraverse[F[_]: Applicative, A, B](list: List[A])(func: A => F[B]): F[List[B]] =
+    list.foldLeft(List.empty[B].pure[F])((acc: F[List[B]], e: A) => {
+      val f = (l: List[B], a: B) => l :+ a
+        (acc: F[List[B]], func(e): F[B]).mapN(f)
+    })
+
+  def listSequence[F[_]: Applicative, B](list: List[F[B]]): F[List[B]] =
+    listTraverse(list)(identity(_))
+
+  val totalUptime: Future[List[Int]] =
+    listTraverse(chapter721.hostnames)(chapter721.getUptime)
+
+  val l: List[Vector[Int]] = List(Vector(1, 2), Vector(3, 4))
+  val v: Vector[List[Int]] = listSequence(l)
+  // scala> chapter722.v
+  // res0: Vector[List[Int]] = Vector(List(1, 3), List(1, 4), List(2, 3), List(2, 4))
+
+  val vl = listSequence(List(Vector(1, 2), Vector(3, 4), Vector(5, 6)))
+  // scala> chapter722.vl
+  // res2: scala.collection.immutable.Vector[List[Int]] = Vector(List(1, 3, 5), List(1, 3, 6), List(1, 4, 5), List(1, 4, 6), List(2, 3, 5), List(2, 3, 6), List(2, 4, 5), List(2, 4, 6))
+
+  def process(inputs: List[Int]): Option[List[Int]] =
+    listTraverse(inputs)(n => if (n % 2 == 0) Some(n) else None)
+  // scala> chapter722.process(List(2, 4, 6))
+  // res3: Option[List[Int]] = Some(List(2, 4, 6))
+
+  // scala> chapter722.process(List(1, 2, 3))
+  // res4: Option[List[Int]] = None
+}
+
+object chapter723 {
+  trait Traverse[F[_]] {
+    def traverse[G[_]: Applicative, A, B](inputs: F[A])(f: A => G[B]): G[F[B]]
+
+    def sequence[G[_]: Applicative, A, B](inputs: F[G[B]]): G[F[B]] =
+      traverse(inputs)(identity(_))
+  }
+
+  val numbers: List[Future[Int]] = List(Future(1), Future(2), Future(3))
+
+  val numbers2: Future[List[Int]] = cats.Traverse[List].sequence(numbers)
+  // scala> Await.result(chapter723.numbers2, 1.second)
+  // res0: List[Int] = List(1, 2, 3)
+
+  // scala> Await.result(chapter723.numbers.sequence, 1.second)
+  // res6: List[Int] = List(1, 2, 3)
 }
